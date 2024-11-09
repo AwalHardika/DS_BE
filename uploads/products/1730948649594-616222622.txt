@@ -1,0 +1,332 @@
+  import { Button, Pagination, Table, message, Spin, Form,Select } from "antd";
+  import React, { useEffect, useState } from "react";
+  import { RiFileDownloadLine } from "react-icons/ri";
+  import axios from "axios";
+  import { NavLink, useLocation, useParams } from "react-router-dom";
+  import dayjs from "dayjs";
+  import { useNavigate } from "react-router-dom";
+
+  const DetailsAntrian = ({status = ''}) => {
+    const [dataReport, setDataReport] = useState(null);
+    const [antrianDetails, setAntrianDetails] = useState([]); // State untuk antrian_details
+    const [loading, setLoading] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [nomorBody, setNomorBody] = useState([]);
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const tab = queryParams.get("tab") || "Reported";
+
+    const dataNomorBody = async () => {
+      const result = await axios('https://api.bootcampkita.com/api/nomor-body/read', {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "GET"
+      });
+      const data = result.data.query.map((value) => ({
+        label: value.nomor_body,
+        value: value.id
+      }));
+      return data;
+    };
+    
+    useEffect(() => {
+      dataNomorBody().then((res) => {
+        setNomorBody(res);
+      });
+    }, []);
+
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(`https://api.bootcampkita.com/api/antrian/read/${id}`);
+        setDataReport(response.data.query);
+        setAntrianDetails(response.data.query.antrian_details || []); // Ambil antrian_details
+      } catch (error) {
+        message.error('Error fetching report data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchData();
+    }, []);
+
+    const handleDownloadPDF = async () => {
+      setLoading(true);
+      try {
+          const response = await axios.get(`https://api.bootcampkita.com/api/antrian/report-day/${id}`, {
+              responseType: 'blob',
+          });
+
+          const tanggalInput = dayjs(dataReport?.tanggal_input).format('YYYY-MM-DD') || 'tanggal_tidak_ditemukan';
+
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `report_cuci_${tanggalInput}.pdf`);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+      } catch (error) {
+          message.error("Gagal mengunduh PDF");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+
+    const downloadPDF = async () => {
+      const tanggalInput = dayjs(dataReport?.tanggal_input).format('YYYY-MM-DD');
+      const nomorBody = antrianDetails[0]?.nomor_body?.nomor_body
+      
+      if (!nomorBody) {
+        message.warning('Nomor body tidak ditemukan');
+        return;
+      }
+    
+      const pdfUrl = `https://api.bootcampkita.com/api/antrian/pdf?tanggal_input=${tanggalInput}&nomor_body=${nomorBody}`;
+      setLoading(true)
+    
+      try {
+        const response = await axios.get(pdfUrl, {
+          responseType: 'blob',
+        });
+        
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'report.pdf');
+    
+        document.body.appendChild(link);
+        link.click();
+    
+        link.parentNode.removeChild(link);
+      } catch (error) {
+        message.error('Error downloading PDF');
+      } finally {
+        setLoading(false)
+      }
+    };
+
+    const updateStatus = async (values) => {
+      setLoading(true);
+      try {
+        const nomorBodyIds = values.antrian_details.flatMap(detail => detail.no_body);
+        const updatedStatus = {
+          antrian_details: nomorBodyIds.map(nomor_body_id => ({
+            status: "onQueue", 
+            nomor_body_id: nomor_body_id 
+          })),
+        };
+
+        console.log(updatedStatus);
+    
+        await axios.put(`https://api.bootcampkita.com/api/antrian/update/${id}`, updatedStatus);
+        message.success("Data user berhasil diperbarui!");
+        navigate('/antrian');
+      } catch (error) {
+        message.error("Gagal memperbarui data user.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+
+    const handleDelete = async (id) => {
+      setLoading(true)
+      try {
+        const ids = antrianDetails.map(detail => detail.id);
+        await axios.delete(`https://api.bootcampkita.com/api/antrian-details/delete/${ids}`);
+        const updatedData = antrianDetails.filter(detail => detail.id !== id);
+        setAntrianDetails(updatedData);
+        alert("Details antrian deleted successfully");
+      } catch (error) {
+        console.error("Error deleting details antrian: ", error);
+        alert("Failed to delete details antrian");
+      } finally {
+        setLoading(false)
+      }
+    };
+
+    
+
+    const dataSource = antrianDetails.map((item, index) => ({
+      key: index,
+      no: index + 1,
+      noBodyUnitAntrian: item.nomor_body?.nomor_body,
+      laporanTerkunci: item.status,
+      id: item.id
+    }));
+
+    const columns = [
+      {
+        title: "No",
+        dataIndex: "no",
+        key: "no",
+      },
+      {
+        title: "No Body Unit Antrian",
+        dataIndex: "noBodyUnitAntrian",
+        key: "noBodyUnitAntrian",
+      },
+      {
+        title: "Laporan Terkunci",
+        dataIndex: "laporanTerkunci",
+        key: "laporanTerkunci",
+        render: (text) => (
+          <a className="border-b border-[#2467E2] text-[#2467E2]">{text}</a>
+        ),
+      },
+      {
+        title: "",
+        dataIndex: "logo",
+        key: "logo",
+        render: (text, record) => (
+          <div className="flex items-center text-center text-[#27AE60] gap-1">
+            <Button
+                type="secondary" 
+                icon={<RiFileDownloadLine className="w-[18px] h-[18px]" />}
+                onClick={() => handleDelete(record.id)}
+              >
+                Delete Antrian Details
+              </Button>
+
+              <NavLink to={`/antrian_details/${record.id}`}>
+              EDIT
+            </NavLink>
+          </div>
+        ),
+      },
+    ];
+
+
+    const onShowSizeChange = (current, pageSize) => {
+      console.log(current, pageSize);
+    };
+
+    return (
+      <main>
+        <h1>Detail Antrian</h1>
+        <div className="w-full h-[716px] bg-white mt-[18px] flex flex-col pl-[33px] pr-[44px] py-[34px] pb-[22px]">
+          {/* Indikator Loading */}
+          {loading ? (
+            <div className="flex justify-center items-center h-full">
+              <Spin size="large" />
+            </div>
+          ) : (
+            <div className="w-full h-auto flex justify-between">
+              <div className="w-[50%] flex flex-col justify-center gap-[15px]">
+                <h1 className="font-normal text-xs text-[#828282]">
+                  Tittle{" "}
+                  <span className="text-[rgb(51,51,51)] font-semibold text-xs ml-[25px]">
+                    Data report {dataReport?.jenis_cuci}
+                  </span>
+                </h1>
+                <h1 className="font-normal text-xs text-[#828282]">
+                  Tanggal{" "}
+                  <span className="text-[#333333] font-normal text-xs ml-[11px]">
+                    {dayjs(dataReport?.tanggal_input).format('YYYY-MM-DD')}
+                  </span>
+                </h1>
+                <h1 className="font-normal text-xs text-[#828282]">
+                  Petugas{" "}
+                  <span className="text-[#333333] font-semibold text-xs ml-[10px]">
+                    {dataReport?.admin_petugas?.nama || "Tidak ada petugas"}
+                  </span>
+                </h1>
+              </div>
+              <div className="flex flex-1 justify-end items-center gap-2">
+
+              {/* <Button
+                  type="secondary"
+                  icon={<RiFileDownloadLine className="w-[18px] h-[18px]" />}
+                  className="w-[167px] h-[33px] rounded-[10px] border-[1.5px] border-[#2467E2] bg-white text-[12px] font-normal text-[#2467E2]"
+                  onClick={updateStatus}
+                >
+                  APPROVED
+                </Button> */}
+              
+                <NavLink
+                  type="secondary"
+                  className="w-[167px] h-[33px] rounded-[10px] border-[1.5px] border-[#e22424] bg-white text-[12px] font-normal text-[#e2245d] flex items-center justify-center"
+                  to={`/antrian?tab=${tab}`}
+                >
+                  KEMBALI
+                </NavLink>
+              </div>
+            </div>
+          )}
+          
+    
+          {!loading && (
+            <div className="mt-[30px]">
+              <Table columns={columns} dataSource={dataSource} pagination={false} loading={loading} />
+              <Pagination
+                align="center"
+                defaultCurrent={1}
+                total={dataSource.length}
+                showSizeChanger
+                onShowSizeChange={onShowSizeChange}
+                className="mt-10"
+              />
+            <Form
+            onFinish={updateStatus}
+            >
+            <Form.List name="antrian_details">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((field, index) => (
+                  <div key={field.key} className="flex items-center gap-5 mb-4">
+                    <Form.Item
+                      {...field}
+                      label={`No Body ${index + 1}`}
+                      name={[field.name, 'no_body']}
+                      fieldKey={[field.fieldKey, 'no_body']}
+                      rules={[{ required: true, message: 'Please select at least one No Body!' }]}
+                      className={`w-[253px]`}
+                    >
+                      <Select
+                        options={nomorBody}
+                        mode="multiple"
+                        showSearch 
+                        placeholder="Pilih No Body"
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        } 
+                      />
+                    </Form.Item>
+
+                    <Button
+                      onClick={() => remove(field.name)}
+                      className="w-[113px] h-10 bg-red-500 text-white"
+                    >
+                      Hapus
+                    </Button>
+                  </div>
+                ))}
+
+                <Button onClick={() => add()} className="w-[201px] h-10 bg-[#BDBDBD] text-white" type="dashed">
+                  + Tambah Unit
+                </Button>
+              </>
+            )}
+          </Form.List>
+            <Button type="primary" htmlType="submit" className="mt-6 ml-4">
+              Tambah Antrian
+            </Button>
+            </Form>
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
+    
+
+  export default DetailsAntrian

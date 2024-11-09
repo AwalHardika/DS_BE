@@ -23,8 +23,8 @@ async function validateUserMdl(req=request, res=response, next) {
         req.userId = decodedToken.userId
         next()
     } catch (error) {
-        console.log(error)
-        res.status(403).json(error.name)
+       console.log(error)
+       return res.status(403).json(error.name)
     }
 }
 

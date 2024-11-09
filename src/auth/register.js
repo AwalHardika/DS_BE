@@ -54,13 +54,7 @@ async function register(req = request, res = response) {
 
         const imagePath = path.join(__dirname, "../../uploads/profile", `${email}-profile.${ekstensi}`)
 
-        let fileName
-        fileName = `${email}-profile.${ekstensi}`
-
-        if(!imageProfile){
-            fileName = "image-profile.png"
-        }
-
+        const fileName = `${email}-profile.${ekstensi}`
         
         // mengkonversi buffer ke file gambar
 
