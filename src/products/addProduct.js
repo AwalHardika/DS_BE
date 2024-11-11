@@ -2,6 +2,7 @@ import {request, response} from "express"
 import multer from "multer"
 import path from "path"
 import db from "../conn"
+import { error } from "console"
 
 
 
@@ -20,8 +21,23 @@ const storage = multer.diskStorage({
     }
 })
 
+const fileFilter = (req, file, cb)=>{
+const allowedTypes = ["image/jpg", "image/png", "image/jpeg"]
+
+if(allowedTypes.includes(file.mimetype)){
+    cb(null, true)
+}
+else{
+    cb(new Error("Only type image"))
+}
+}
+
 const upload = multer({
-    storage : storage
+    storage : storage,
+    fileFilter : fileFilter,
+    limits : {
+        fileSize : 5 * 1024 * 1024
+    }
 })
 
 
