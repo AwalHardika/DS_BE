@@ -19,9 +19,24 @@ const storage = multer.diskStorage({
     }
 })
 
-const upload = multer({
-    storage: storage
-})
+const filefilter = (req, file, cb)=>{
+    const allowedType = ["image/jpg", "image/png", "image/jpeg"]
+    
+    if(allowedType.includes(file.mimetype)){
+        cb(null, true)
+    }
+    else {
+        cb(new Error("Only Type Image"))
+    }
+    }
+    
+    const upload = multer({
+        storage: storage,
+        fileFilter : filefilter,
+        limits : {
+            fileSize : 5 * 1024 * 1024
+        }
+    })
 
 async function updateProduct(req = request, res = response) {
     try {
@@ -42,7 +57,7 @@ async function updateProduct(req = request, res = response) {
                 message : "Product tidak ditemukan"
             })
         }
-        // inisiasi variabel yang valuenya product.imgProduct jika si user tidak melakukan upload ulang
+        // inisiasi variabel yang valuenya product.imgProduct jika si user tidak melakukan upload image baru
         let imgProductPath = product.imgProduct 
 
         if(req.file){
