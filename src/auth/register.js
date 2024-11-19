@@ -23,7 +23,7 @@ async function register(req = request, res = response) {
                 message : "Email Sudah Ada"
             })
         }
-        const defaultImage = "defaultProfile.png"
+        let defaultImage = "defaultProfile.png"
         // validasi type image dari image profil
         if(imageProfile){
             const mimeType = imageProfile.match(/data:(image\/\w+);base64,/)
