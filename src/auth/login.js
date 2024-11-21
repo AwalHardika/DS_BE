@@ -31,7 +31,7 @@ try {
     }
     const jwt_key = process.env.JWT_SECRET_KEY
     const token = await jwt.sign({userId : findUser.id}, jwt_key, {
-       expiresIn : "1d" 
+       expiresIn : "1m" 
     })
 
     res.status(200).json(token)
